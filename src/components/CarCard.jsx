@@ -6,12 +6,12 @@ import { useExpense } from '../context/ExpenseContext';
 export default function CarCard({ car }) {
     const navigate = useNavigate();
     const { getCarTotal } = useExpense();
-    const total = getCarTotal(car.id);
+    const total = getCarTotal(car._id);
 
     return (
         <div
             className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
-            onClick={() => navigate(`/car/${car.id}`)}
+            onClick={() => navigate(`/car/${car._id}`)}
         >
             <div className="flex justify-between items-start mb-4">
                 <div className="h-12 w-12 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-blue-50 transition-colors text-blue-500">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExpense } from '../context/ExpenseContext';
 import Layout from '../components/Layout';
@@ -18,7 +18,7 @@ const EXPENSE_TYPES = [
 export default function CarDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { cars, getCarExpenses, getCarTotal, addExpense, updateExpense, deleteExpense, updateCar, deleteCar } = useExpense();
+    const { cars, getCarExpenses, fetchCarExpenses, getCarTotal, addExpense, updateExpense, deleteExpense, updateCar, deleteCar } = useExpense();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
@@ -34,7 +34,7 @@ export default function CarDetails() {
     const [carYear, setCarYear] = useState('');
     const [carLicense, setCarLicense] = useState('');
 
-    const car = cars.find(c => c.id === id);
+    const car = cars.find(c => c._id === id || c.id === id); // Handle mongo _id
 
     if (!car) {
         return (
@@ -51,8 +51,14 @@ export default function CarDetails() {
         );
     }
 
-    const expenses = getCarExpenses(id);
-    const total = getCarTotal(id);
+    useEffect(() => {
+        if (car) {
+            fetchCarExpenses(car._id || car.id);
+        }
+    }, [car, fetchCarExpenses]);
+
+    const expenses = getCarExpenses(car?._id || car?.id);
+    const total = getCarTotal(car?._id || car?.id);
 
     const handleAddExpense = (e) => {
         e.preventDefault();
@@ -67,9 +73,9 @@ export default function CarDetails() {
         };
 
         if (editingExpense) {
-            updateExpense(id, editingExpense.id, expenseData);
+            updateExpense(car._id || car.id, editingExpense._id || editingExpense.id, expenseData);
         } else {
-            addExpense(id, expenseData);
+            addExpense(car._id || car.id, expenseData);
         }
 
         // Reset Form
@@ -94,7 +100,7 @@ export default function CarDetails() {
 
     const handleDeleteExpense = (expenseId) => {
         if (window.confirm('Are you sure you want to delete this expense?')) {
-            deleteExpense(id, expenseId);
+            deleteExpense(car._id || car.id, expenseId);
         }
     };
 
@@ -109,7 +115,7 @@ export default function CarDetails() {
     const handleUpdateCar = (e) => {
         e.preventDefault();
         if (!carMake || !carModel || !carYear) return;
-        updateCar(id, {
+        updateCar(car._id || car.id, {
             make: carMake,
             model: carModel,
             year: carYear,
@@ -120,7 +126,7 @@ export default function CarDetails() {
 
     const handleDeleteCar = () => {
         if (window.confirm('Are you sure you want to delete this vehicle and all its expenses?')) {
-            deleteCar(id);
+            deleteCar(car._id || car.id);
             navigate('/');
         }
     };
@@ -215,13 +221,21 @@ export default function CarDetails() {
                         </div>
                     ) : (
                         <div className="space-y-1">
-                            {expenses.map((expense) => (
-                                <ExpenseItem
-                                    key={expense.id}
-                                    expense={expense}
-                                    onEdit={() => handleEditExpense(expense)}
-                                    onDelete={() => handleDeleteExpense(expense.id)}
-                                />
+                            {expenses.map((expense, index) => (
+                                <motion.div
+                                    key={expense._id || expense.id || index}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9 }}
+                                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                                >
+                                    <ExpenseItem
+                                        key={expense._id || expense.id}
+                                        expense={expense}
+                                        onEdit={() => handleEditExpense(expense)}
+                                        onDelete={() => handleDeleteExpense(expense._id || expense.id)}
+                                    />
+                                </motion.div>
                             ))}
                         </div>
                     )}
