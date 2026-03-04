@@ -18,10 +18,13 @@ export default function Dashboard() {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState('newest');
+    const [statusFilter, setStatusFilter] = useState('All');
     const globalTotal = getTotalExpenses();
 
     const filteredAndSortedCars = cars
         .filter(car => {
+            if (statusFilter === 'Available' && car.status === 'Sold') return false;
+            if (statusFilter === 'Sold' && car.status !== 'Sold') return false;
             if (!searchQuery) return true;
             const searchTerm = searchQuery.toLowerCase();
             return (
@@ -80,7 +83,19 @@ export default function Dashboard() {
             </div>
 
             {cars.length > 0 && (
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex flex-col lg:flex-row gap-4 mb-6">
+                    <div className="flex bg-slate-100 p-1 rounded-xl lg:w-auto w-full shrink-0">
+                        {['All', 'Available', 'Sold'].map(status => (
+                            <button
+                                key={status}
+                                onClick={() => setStatusFilter(status)}
+                                className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === status ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {status}
+                            </button>
+                        ))}
+                    </div>
+
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <Search className="h-5 w-5 text-slate-400" />

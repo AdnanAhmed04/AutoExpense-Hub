@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useExpense } from '../context/ExpenseContext';
 import Layout from '../components/Layout';
 import ExpenseItem from '../components/ExpenseItem';
-import { ArrowLeft, Car, Plus, X, Receipt, SearchX, DollarSign, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Car, Plus, X, Receipt, SearchX, DollarSign, Edit2, Trash2, CheckCircle2, FileText, UploadCloud, Share2, Printer, Download, Trash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EXPENSE_TYPES = [
@@ -18,7 +18,7 @@ const EXPENSE_TYPES = [
 export default function CarDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { cars, getCarExpenses, fetchCarExpenses, getCarTotal, addExpense, updateExpense, deleteExpense, updateCar, deleteCar } = useExpense();
+    const { cars, getCarExpenses, fetchCarExpenses, getCarTotal, addExpense, updateExpense, deleteExpense, updateCar, deleteCar, uploadDocument, deleteDocument } = useExpense();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
@@ -34,7 +34,20 @@ export default function CarDetails() {
     const [carYear, setCarYear] = useState('');
     const [carLicense, setCarLicense] = useState('');
 
+    const [isSoldModalOpen, setIsSoldModalOpen] = useState(false);
+    const [soldPrice, setSoldPrice] = useState('');
+
+    const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
+    const [documentType, setDocumentType] = useState('sale'); // 'sale' or 'purchase'
+    const [isUploading, setIsUploading] = useState(false);
+
     const car = cars.find(c => c._id === id || c.id === id); // Handle mongo _id
+
+    useEffect(() => {
+        if (car) {
+            fetchCarExpenses(car._id || car.id);
+        }
+    }, [car, fetchCarExpenses]);
 
     if (!car) {
         return (
@@ -50,12 +63,6 @@ export default function CarDetails() {
             </Layout>
         );
     }
-
-    useEffect(() => {
-        if (car) {
-            fetchCarExpenses(car._id || car.id);
-        }
-    }, [car, fetchCarExpenses]);
 
     const expenses = getCarExpenses(car?._id || car?.id);
     const total = getCarTotal(car?._id || car?.id);
@@ -131,6 +138,59 @@ export default function CarDetails() {
         }
     };
 
+    const handleMarkAsSold = (e) => {
+        e.preventDefault();
+        if (!soldPrice) return;
+        updateCar(car._id || car.id, {
+            status: 'Sold',
+            soldPrice: Number(soldPrice)
+        });
+        setIsSoldModalOpen(false);
+    };
+
+    const handleFileUpload = async (e, type) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            setIsUploading(true);
+            await uploadDocument(car._id || car.id, type, file);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to upload document');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteDocument = async (type) => {
+        if (window.confirm('Are you sure you want to delete this document?')) {
+            try {
+                await deleteDocument(car._id || car.id, type);
+            } catch (error) {
+                console.error(error);
+                alert('Failed to delete document');
+            }
+        }
+    };
+
+    const openTemplateModal = (type) => {
+        if (type === 'sale') {
+            window.open('/templates/sale_receipt_template.pdf', '_blank');
+        } else {
+            window.open('/templates/vehicle_delivery_letter_template.pdf', '_blank');
+        }
+    };
+
+    const handleShareWhatsApp = (type) => {
+        // Construct the proxy URL using your backend server so it bypasses Cloudinary 401s
+        const proxyUrl = `http://localhost:5000/api/documents/view/${car._id || car.id}/${type}`;
+
+        // Pass the proxy URL to Google Viewer so WhatsApp embeds it cleanly
+        const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(proxyUrl)}&embedded=true`;
+
+        window.open(`https://wa.me/?text=Check%20out%20this%20document:%20${encodeURIComponent(googleViewerUrl)}`, '_blank');
+    };
+
     return (
         <Layout>
             <div className="mb-6">
@@ -160,16 +220,33 @@ export default function CarDetails() {
 
                     <div className="mt-8 md:mt-0 text-left md:text-right relative z-10 flex flex-col md:items-end">
                         <div className="flex gap-2 mb-4">
-                            <button onClick={handleEditCarOpen} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 bg-white rounded-full transition-all shadow-sm border border-slate-100">
+                            {car.status !== 'Sold' && (
+                                <button onClick={() => setIsSoldModalOpen(true)} className="px-3 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all shadow-sm border border-emerald-100 flex items-center">
+                                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> Mark Sold
+                                </button>
+                            )}
+                            <button onClick={handleEditCarOpen} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 bg-white rounded-xl transition-all shadow-sm border border-slate-100">
                                 <Edit2 className="h-4 w-4" />
                             </button>
-                            <button onClick={handleDeleteCar} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 bg-white rounded-full transition-all shadow-sm border border-slate-100">
+                            <button onClick={handleDeleteCar} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 bg-white rounded-xl transition-all shadow-sm border border-slate-100">
                                 <Trash2 className="h-4 w-4" />
                             </button>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">Total Spent</p>
-                            <p className="text-4xl font-extrabold text-blue-600">${total.toLocaleString()}</p>
+                            {car.status === 'Sold' ? (
+                                <>
+                                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">Total Profit</p>
+                                    <p className={`text-4xl font-extrabold ${car.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                        {car.profit >= 0 ? '+' : '-'}${Math.abs(car.profit || 0).toLocaleString()}
+                                    </p>
+                                    <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider">Sold for ${Number(car.soldPrice || 0).toLocaleString()}</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-1">Total Spent</p>
+                                    <p className="text-4xl font-extrabold text-blue-600">${total.toLocaleString()}</p>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -180,21 +257,23 @@ export default function CarDetails() {
                 <div className="flex-1">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-bold text-slate-900">Expense History</h2>
-                        <button
-                            onClick={() => {
-                                setEditingExpense(null);
-                                setTitle('');
-                                setDescription('');
-                                setPrice('');
-                                setType(EXPENSE_TYPES[0]);
-                                setImage('');
-                                setIsModalOpen(true);
-                            }}
-                            className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl hover:bg-slate-800 transition-all font-medium text-sm shadow-sm"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span className="hidden sm:inline">Add Expense</span>
-                        </button>
+                        {car.status !== 'Sold' && (
+                            <button
+                                onClick={() => {
+                                    setEditingExpense(null);
+                                    setTitle('');
+                                    setDescription('');
+                                    setPrice('');
+                                    setType(EXPENSE_TYPES[0]);
+                                    setImage('');
+                                    setIsModalOpen(true);
+                                }}
+                                className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl hover:bg-slate-800 transition-all font-medium text-sm shadow-sm"
+                            >
+                                <Plus className="h-4 w-4" />
+                                <span className="hidden sm:inline">Add Expense</span>
+                            </button>
+                        )}
                     </div>
 
                     {expenses.length === 0 ? (
@@ -239,6 +318,78 @@ export default function CarDetails() {
                             ))}
                         </div>
                     )}
+                </div>
+
+                {/* Right Col: Documents */}
+                <div className="lg:w-1/3 flex flex-col gap-6">
+                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
+                            <FileText className="h-5 w-5 mr-2 text-blue-600" />
+                            Documents
+                        </h2>
+
+                        {/* Purchase Document */}
+                        <div className="border border-slate-100 rounded-xl p-4 mb-4 bg-slate-50 relative overflow-hidden">
+                            <h3 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wider">Purchase Document</h3>
+                            {car.purchaseDocumentUrl ? (
+                                <div>
+                                    <a href={car.purchaseDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm font-medium hover:underline flex items-center mb-4">
+                                        <FileText className="h-4 w-4 mr-1" /> View Document
+                                    </a>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleShareWhatsApp('purchase')} className="text-xs flex items-center justify-center bg-emerald-50 text-emerald-600 px-3 py-2 rounded-lg hover:bg-emerald-100 font-medium transition-colors flex-1">
+                                            <Share2 className="h-3 w-3 mr-1" /> Share
+                                        </button>
+                                        <button onClick={() => handleDeleteDocument('purchase')} className="text-xs flex items-center justify-center bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 font-medium transition-colors flex-1">
+                                            <Trash className="h-3 w-3 mr-1" /> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <label className="flex items-center justify-center w-full py-2.5 px-4 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 hover:border-blue-400 transition-colors">
+                                        <UploadCloud className="h-4 w-4 mr-2 text-slate-400" />
+                                        <span className="text-sm font-medium text-slate-600">{isUploading ? 'Uploading...' : 'Upload File'}</span>
+                                        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, 'purchase')} disabled={isUploading} />
+                                    </label>
+                                    <button onClick={() => openTemplateModal('purchase')} className="flex items-center justify-center w-full py-2 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                                        <Printer className="h-4 w-4 mr-2 text-slate-400" /> Delivery Letter Template
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Sale Document */}
+                        <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 relative overflow-hidden">
+                            <h3 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wider">Sale Document</h3>
+                            {car.saleDocumentUrl ? (
+                                <div>
+                                    <a href={car.saleDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm font-medium hover:underline flex items-center mb-4">
+                                        <FileText className="h-4 w-4 mr-1" /> View Document
+                                    </a>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleShareWhatsApp('sale')} className="text-xs flex items-center justify-center bg-emerald-50 text-emerald-600 px-3 py-2 rounded-lg hover:bg-emerald-100 font-medium transition-colors flex-1">
+                                            <Share2 className="h-3 w-3 mr-1" /> Share
+                                        </button>
+                                        <button onClick={() => handleDeleteDocument('sale')} className="text-xs flex items-center justify-center bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 font-medium transition-colors flex-1">
+                                            <Trash className="h-3 w-3 mr-1" /> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <label className="flex items-center justify-center w-full py-2.5 px-4 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 hover:border-blue-400 transition-colors">
+                                        <UploadCloud className="h-4 w-4 mr-2 text-slate-400" />
+                                        <span className="text-sm font-medium text-slate-600">{isUploading ? 'Uploading...' : 'Upload File'}</span>
+                                        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, 'sale')} disabled={isUploading} />
+                                    </label>
+                                    <button onClick={() => openTemplateModal('sale')} className="flex items-center justify-center w-full py-2 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                                        <Printer className="h-4 w-4 mr-2 text-slate-400" /> Sale Receipt Template
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -451,6 +602,80 @@ export default function CarDetails() {
                                     className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all shadow-sm"
                                 >
                                     Update Vehicle
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Mark as Sold Modal */}
+            <AnimatePresence>
+                {isSoldModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                            onClick={() => setIsSoldModalOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white rounded-3xl w-full max-w-sm relative z-10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                                <h3 className="text-lg font-bold text-slate-800">Mark as Sold</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSoldModalOpen(false)}
+                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-6">
+                                <form id="sold-form" onSubmit={handleMarkAsSold} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Sold Price</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <DollarSign className="h-4 w-4 text-slate-400" />
+                                            </div>
+                                            <input
+                                                type="number"
+                                                required
+                                                step="0.01"
+                                                value={soldPrice}
+                                                onChange={(e) => setSoldPrice(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-slate-800"
+                                                placeholder="e.g. 15000"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-500">
+                                        Total Expenses so far: <span className="font-bold text-slate-700">${total.toLocaleString()}</span>
+                                    </p>
+                                </form>
+                            </div>
+
+                            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSoldModalOpen(false)}
+                                    className="px-5 py-2.5 rounded-xl text-slate-600 font-medium hover:bg-slate-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="sold-form"
+                                    className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-200 transition-all shadow-sm"
+                                >
+                                    Confirm Sale
                                 </button>
                             </div>
                         </motion.div>

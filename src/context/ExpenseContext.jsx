@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from './AuthContext';
 import { carsApi } from '../api/cars';
 import { expensesApi } from '../api/expenses';
+import { documentApi } from '../api/documents';
 
 const ExpenseContext = createContext();
 
@@ -163,6 +164,30 @@ export const ExpenseProvider = ({ children }) => {
         return cars.reduce((sum, car) => sum + (car.totalExpenses || 0), 0);
     };
 
+    const uploadDocument = async (carId, type, file) => {
+        try {
+            const data = await documentApi.uploadDocument(carId, type, file);
+            // Replace the updated car in the state
+            setCars(prev => prev.map(c => c._id === carId ? data.car : c));
+            return data.car;
+        } catch (error) {
+            console.error('Failed to upload document:', error);
+            throw error;
+        }
+    };
+
+    const deleteDocument = async (carId, type) => {
+        try {
+            const data = await documentApi.deleteDocument(carId, type);
+            // Replace the updated car in the state
+            setCars(prev => prev.map(c => c._id === carId ? data.car : c));
+            return data.car;
+        } catch (error) {
+            console.error('Failed to delete document:', error);
+            throw error;
+        }
+    };
+
     return (
         <ExpenseContext.Provider value={{
             cars,
@@ -177,6 +202,8 @@ export const ExpenseProvider = ({ children }) => {
             getCarExpenses,
             getCarTotal,
             getTotalExpenses,
+            uploadDocument,
+            deleteDocument,
             loading
         }}>
             {children}

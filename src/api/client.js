@@ -22,7 +22,12 @@ export async function client(endpoint, { body, ...customConfig } = {}) {
     };
 
     if (body) {
-        config.body = JSON.stringify(body);
+        if (body instanceof FormData) {
+            config.body = body;
+            delete config.headers['Content-Type'];
+        } else {
+            config.body = JSON.stringify(body);
+        }
     }
 
     try {
