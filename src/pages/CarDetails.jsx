@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExpense } from '../context/ExpenseContext';
+import { useAuth } from '../context/AuthContext';
+import { generateExpensePDF } from '../utils/pdfExport';
 import Layout from '../components/Layout';
 import ExpenseItem from '../components/ExpenseItem';
-import { ArrowLeft, Car, Plus, X, Receipt, SearchX, DollarSign, Edit2, Trash2, CheckCircle2, FileText, UploadCloud, Share2, Printer, Download, Trash } from 'lucide-react';
+import { ArrowLeft, Car, Plus, X, Receipt, SearchX, DollarSign, Edit2, Trash2, CheckCircle2, FileText, UploadCloud, Share2, Printer, Download, Trash, FileDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EXPENSE_TYPES = [
@@ -18,6 +20,7 @@ const EXPENSE_TYPES = [
 export default function CarDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const { cars, getCarExpenses, fetchCarExpenses, getCarTotal, addExpense, updateExpense, deleteExpense, updateCar, deleteCar, uploadDocument, deleteDocument } = useExpense();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,6 +194,10 @@ export default function CarDetails() {
         window.open(`https://wa.me/?text=Check%20out%20this%20document:%20${encodeURIComponent(googleViewerUrl)}`, '_blank');
     };
 
+    const handleExportPDF = () => {
+        generateExpensePDF(car, expenses, user, total);
+    };
+
     return (
         <Layout>
             <div className="mb-6">
@@ -257,23 +264,34 @@ export default function CarDetails() {
                 <div className="flex-1">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-bold text-slate-900">Expense History</h2>
-                        {car.status !== 'Sold' && (
-                            <button
-                                onClick={() => {
-                                    setEditingExpense(null);
-                                    setTitle('');
-                                    setDescription('');
-                                    setPrice('');
-                                    setType(EXPENSE_TYPES[0]);
-                                    setImage('');
-                                    setIsModalOpen(true);
-                                }}
-                                className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl hover:bg-slate-800 transition-all font-medium text-sm shadow-sm"
-                            >
-                                <Plus className="h-4 w-4" />
-                                <span className="hidden sm:inline">Add Expense</span>
-                            </button>
-                        )}
+                        <div className="flex gap-2">
+                            {expenses.length > 0 && (
+                                <button
+                                    onClick={handleExportPDF}
+                                    className="flex items-center space-x-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 transition-all font-medium text-sm shadow-sm"
+                                >
+                                    <FileDown className="h-4 w-4 text-blue-600" />
+                                    <span className="hidden sm:inline">Export Report</span>
+                                </button>
+                            )}
+                            {car.status !== 'Sold' && (
+                                <button
+                                    onClick={() => {
+                                        setEditingExpense(null);
+                                        setTitle('');
+                                        setDescription('');
+                                        setPrice('');
+                                        setType(EXPENSE_TYPES[0]);
+                                        setImage('');
+                                        setIsModalOpen(true);
+                                    }}
+                                    className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl hover:bg-slate-800 transition-all font-medium text-sm shadow-sm"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Add Expense</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {expenses.length === 0 ? (
